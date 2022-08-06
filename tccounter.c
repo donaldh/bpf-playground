@@ -32,7 +32,7 @@ const char *argp_program_bug_address = "<donald.hunter@redhat.com>";
 const char argp_program_doc[] =
 "BPF tccounter demo application.\n"
 "\n"
-"It traces xdp packets and reports packet statistics.\n"
+"Trace packets at the tc hook and report packet statistics.\n"
 "\n"
 "USAGE: ./tccounter [-v]\n";
 
