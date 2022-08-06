@@ -1,0 +1,43 @@
+* bpf-playground
+
+** Prerequisites
+
+#+begin_src sh :results output
+dnf install -y libbpf bpftool
+#+end_src
+
+** Programs
+
+- packetstat - an example XDP program
+- tccounter - an example tc program
+
+** Usage
+
+#+begin_src sh :results outpu
+$ ./tccounter --help
+Usage: tccounter [OPTION...]
+BPF tccounter demo application.
+
+Trace packets at the tc hook and report packet statistics.
+
+USAGE: ./tccounter [-v]
+
+  -d, --device=ifname        Attach to device
+  -i, --interval=seconds     Interval between reports
+  -v, --verbose              Verbose debug output
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Report bugs to <donald.hunter@redhat.com>.
+#+end_src
+
+** Running tccounter
+
+#+begin_src sh :results output
+$ make
+$ sudo ./tcounter -d eth0
+#+end_src
