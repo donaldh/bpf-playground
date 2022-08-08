@@ -20,4 +20,4 @@ spec:
         imagePullPolicy: Always
         securityContext:
           privileged: true
-        args: ['sleep', '10000']
+        args: ['iperf3', '-s']
