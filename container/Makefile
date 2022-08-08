@@ -1,4 +1,5 @@
 PROGS=tc_svc.o
+TC_IMG=localhost:5000/tc
 
 progs:	## Build the BPF programs
 progs:	$(PROGS)
@@ -7,11 +8,12 @@ progs:	$(PROGS)
 	clang -g -O2 -Wall -target bpf -c $< -o $@
 
 images:	## Build docker images
+images:	$(PROGS)
 	docker build --tag fedora-net:36 -f Dockerfile.fedora-net .
-	docker build --tag localhost:5000/tc -f Dockerfile.tc .
+	docker build --tag $(TC_IMG) -f Dockerfile.tc .
 
 push:	## Push docker images
-	docker push localhost:5000/tc
+	docker push $(TC_IMG)
 
 clean:	## Delete compiled code
 	rm -f $(PROGS)
