@@ -12,7 +12,7 @@ $ make images push
 $ kubectl apply -f tc.yaml
 #+end_src
 
-Connect to one of the ~tc~ pod replicas and run `./tc.sh` to load the BPF program. You can
+Open a shell on one of the ~tc~ pod replicas and run `./tc.sh` to load the BPF program. You can
 ~ping~ or run ~iperf3 -c~ from the other pod replica.
 
 ** Debug
