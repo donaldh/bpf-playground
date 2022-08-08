@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tc
+  labels:
+    app: tc
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tc
+  template:
+    metadata:
+      labels:
+        app: tc
+    spec:
+      containers:
+      - name: tc
+        image: localhost:5000/tc:latest
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        args: ['sleep', '10000']

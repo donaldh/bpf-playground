@@ -42,7 +42,6 @@ void bpf_ct_release(struct nf_conn *) __ksym;
 SEC("tc")
 int tc_main(struct __sk_buff *skb)
 {
-
     struct bpf_sock_tuple    bpf_tuple;
 
     struct bpf_ct_opts___local opts_def = { .l4proto = IPPROTO_TCP, .netns_id = -1 };
@@ -58,7 +57,7 @@ int tc_main(struct __sk_buff *skb)
 
     const int l3_off = ETH_HLEN;                      // IP header offset
     const int l4_off = l3_off + sizeof(struct iphdr); // L4 header offset
-    const int tcp_end = l4_off + sizeof(struct tcphdr); 
+    const int tcp_end = l4_off + sizeof(struct tcphdr);
 
     void *data = (void*)(long)skb->data;
     void *data_end = (void*)(long)skb->data_end;
