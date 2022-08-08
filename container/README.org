@@ -14,3 +14,9 @@ $ kubectl apply -f tc.yaml
 
 Connect to one of the ~tc~ pod replicas and run `./tc.sh` to load the BPF program. You can
 ~ping~ or run ~iperf3 -c~ from the other pod replica.
+
+** Debug
+
+#+begin_src sh :results output
+sudo cat /sys/kernel/debug/tracing/trace_pipe
+#+end_src
