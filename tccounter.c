@@ -199,6 +199,8 @@ int main(int argc, char **argv)
 			continue;
 		}
 
+                printf("\033[H\033[JIncoming packets on %s\n\n", env.ifname);
+
 		print_values(stats_fd);
 	}
 
