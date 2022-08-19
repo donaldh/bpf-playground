@@ -13,7 +13,7 @@ CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) -lbpf
 
 
-APPS = packetstat tccounter
+APPS = packetstat tccounter skb-drops
 
 # Get Clang's default includes on this system. We'll explicitly add these dirs
 # to the includes list when compiling with `-target bpf` because otherwise some
