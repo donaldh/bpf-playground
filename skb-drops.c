@@ -175,7 +175,7 @@ static void print_values(int map_fd)
 			fprintf(stderr, "Failed to lookup elem with key %d: %s\n", *cur_key, strerror(-ret));
 			break;
 		}
-		printf("%s (%d): %llu drops\n", drop_reasons[next_key], next_key, value);
+		printf("%24s : %llu drops\n", drop_reasons[next_key], value);
 		cur_key = &next_key;
 	} while (next == 0);
 }
@@ -231,7 +231,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-                printf("\033[H\033[JTCP Drop Reasons\n\n");
+                printf("\033[H\033[JSKB Drop Reasons\n\n");
 
 		print_values(stats_fd);
 	}
