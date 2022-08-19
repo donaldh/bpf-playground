@@ -13,6 +13,7 @@
 #include "skb-drops.skel.h"
 
 const char * const drop_reasons[] = {
+	"SKB_NOT_DROPPED_YET",
 	"NOT_SPECIFIED",
 	"NO_SOCKET",
 	"PKT_TOO_SMALL",
@@ -157,29 +158,24 @@ static void sig_handler(int sig)
 
 static void print_values(int map_fd)
 {
-	uint64_t *cur_key = 0;
-	uint64_t next_key;
+	int *cur_key = NULL;
+	int next_key;
 	int next;
 	do {
 		next = bpf_map_get_next_key(map_fd, cur_key, &next_key);
-		printf("next = %d\n", next);
 		if (next == -ENOENT)
 			break;
 		if (next < 0) {
 			fprintf(stderr, "bpf_map_get_next_key %d returned %s\n", map_fd, strerror(-next));
 			break;
 		}
-		if (cur_key == 0)
-			break;
-
 		__u64 value;
 		int ret = bpf_map_lookup_elem(map_fd, &next_key, &value);
 		if (ret < 0) {
-			fprintf(stderr, "Failed to lookup elem with key %lu: %s\n", *cur_key, strerror(-ret));
+			fprintf(stderr, "Failed to lookup elem with key %d: %s\n", *cur_key, strerror(-ret));
 			break;
 		}
-		printf("%lu\n", *cur_key);
-		printf("%s: %llu drops\n", drop_reasons[*cur_key], value);
+		printf("%s (%d): %llu drops\n", drop_reasons[next_key], next_key, value);
 		cur_key = &next_key;
 	} while (next == 0);
 }

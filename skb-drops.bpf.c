@@ -12,6 +12,7 @@ struct {
 } drop_reasons SEC(".maps");
 
 struct kfree_skb_args {
+	unsigned long long pad;
 	void *skbaddr;
 	void *location;
 	unsigned short protocol;
