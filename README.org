@@ -9,6 +9,7 @@ dnf install -y libbpf bpftool
 ** Programs
 
 - packetstat - an example XDP program
+- skb-drops - monitor SKB drop reasons
 - tccounter - an example tc program
 
 ** Usage
