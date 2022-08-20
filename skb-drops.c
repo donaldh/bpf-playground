@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #include <bpf/bpf.h>
-#include <net/if.h>
 #include <string.h>
 
 #include "skb-drops.skel.h"
@@ -82,23 +81,20 @@ const char * const drop_reasons[] = {
 };
 
 static struct env {
-	char ifname[IF_NAMESIZE];
-	int ifindex;
 	int interval;
 	bool verbose;
-} env = {"", -1, 1, 0};
+} env = { 1, 0 };
 
-const char *argp_program_version = "tccounter 0.0";
+const char *argp_program_version = "skb-drops 0.0";
 const char *argp_program_bug_address = "<donald.hunter@redhat.com>";
 const char argp_program_doc[] =
-"BPF tccounter demo application.\n"
+"BPF program to count SKB drop reasons.\n"
 "\n"
-"Trace packets at the tc hook and report packet statistics.\n"
+"Trace SKB drops and display a summary count of drop reasons.\n"
 "\n"
-"USAGE: ./tccounter [-v]\n";
+"USAGE: ./skb-drops [-v]\n";
 
 static const struct argp_option opts[] = {
-	{ "device", 'd', "ifname", 0, "Attach to device" },
 	{ "interval", 'i', "seconds", 0, "Interval between reports" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
@@ -107,20 +103,6 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	switch (key) {
-	case 'd':
-		if (strlen(arg) >= IF_NAMESIZE) {
-			fprintf(stderr, "ERR: --device name too long\n");
-			return ARGP_ERR_UNKNOWN;
-		}
-		strncpy(env.ifname, arg, IF_NAMESIZE);
-		env.ifindex = if_nametoindex(env.ifname);
-		if (env.ifindex == 0) {
-			fprintf(stderr,
-				"ERR: --device name unknown err(%d):%s\n",
-				errno, strerror(errno));
-			return ARGP_ERR_UNKNOWN;
-		}
-		break;
 	case 'i':
 		env.interval = atoi(arg);
 		break;
@@ -175,7 +157,7 @@ static void print_values(int map_fd)
 			fprintf(stderr, "Failed to lookup elem with key %d: %s\n", *cur_key, strerror(-ret));
 			break;
 		}
-		printf("%24s : %llu drops\n", drop_reasons[next_key], value);
+		printf("%24s : %8llu drops\n", drop_reasons[next_key], value);
 		cur_key = &next_key;
 	} while (next == 0);
 }
@@ -220,7 +202,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-        //	int prog_fd = bpf_program__fd(skel->progs.count_drops);
 	int stats_fd = bpf_map__fd(skel->maps.drop_reasons);
 
         while (!exiting) {
