@@ -14,7 +14,36 @@ dnf install -y libbpf bpftool
 
 ** Usage
 
-#+begin_src sh :results outpu
+*** skb-drops
+
+#+begin_src sh :results output
+./skb-drops --help
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Usage: skb-drops [OPTION...]
+BPF program to count SKB drop reasons.
+
+Trace SKB drops and display a summary count of drop reasons.
+
+USAGE: ./skb-drops [-v]
+
+  -i, --interval=seconds     Interval between reports
+  -v, --verbose              Verbose debug output
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Report bugs to <donald.hunter@redhat.com>.
+#+end_example
+
+*** tccounter
+
+#+begin_src sh :results output
 $ ./tccounter --help
 Usage: tccounter [OPTION...]
 BPF tccounter demo application.
