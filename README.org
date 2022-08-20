@@ -17,11 +17,8 @@ dnf install -y libbpf bpftool
 *** skb-drops
 
 #+begin_src sh :results output
-./skb-drops --help
-#+end_src
+$ ./skb-drops --help
 
-#+RESULTS:
-#+begin_example
 Usage: skb-drops [OPTION...]
 BPF program to count SKB drop reasons.
 
@@ -39,12 +36,13 @@ Mandatory or optional arguments to long options are also mandatory or optional
 for any corresponding short options.
 
 Report bugs to <donald.hunter@redhat.com>.
-#+end_example
+#+end_src
 
 *** tccounter
 
 #+begin_src sh :results output
 $ ./tccounter --help
+
 Usage: tccounter [OPTION...]
 BPF tccounter demo application.
 
