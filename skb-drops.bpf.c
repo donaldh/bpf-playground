@@ -7,7 +7,7 @@
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 32);
-	__type(key, int);
+	__type(key, enum skb_drop_reason);
 	__type(value, __u64);
 } drop_reasons SEC(".maps");
 
