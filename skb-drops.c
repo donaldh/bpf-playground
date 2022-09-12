@@ -11,74 +11,17 @@
 
 #include "skb-drops.skel.h"
 
-const char * const drop_reasons[] = {
-	"SKB_NOT_DROPPED_YET",
-	"NOT_SPECIFIED",
-	"NO_SOCKET",
-	"PKT_TOO_SMALL",
-	"TCP_CSUM",
-	"SOCKET_FILTER",
-	"UDP_CSUM",
-	"NETFILTER_DROP",
-	"OTHERHOST",
-	"IP_CSUM",
-	"IP_INHDR",
-	"IP_RPFILTER",
-	"UNICAST_IN_L2_MULTICAST",
-	"XFRM_POLICY",
-	"IP_NOPROTO",
-	"SOCKET_RCVBUFF",
-	"PROTO_MEM",
-	"TCP_MD5NOTFOUND",
-	"TCP_MD5UNEXPECTED",
-	"TCP_MD5FAILURE",
-	"SOCKET_BACKLOG",
-	"TCP_FLAGS",
-	"TCP_ZEROWINDOW",
-	"TCP_OLD_DATA",
-	"TCP_OVERWINDOW",
-	"TCP_OFOMERGE",
-	"TCP_RFC7323_PAWS",
-	"TCP_INVALID_SEQUENCE",
-	"TCP_RESET",
-	"TCP_INVALID_SYN",
-	"TCP_CLOSE",
-	"TCP_FASTOPEN",
-	"TCP_OLD_ACK",
-	"TCP_TOO_OLD_ACK",
-	"TCP_ACK_UNSENT_DATA",
-	"TCP_OFO_QUEUE_PRUNE",
-	"TCP_OFO_DROP",
-	"IP_OUTNOROUTES",
-	"BPF_CGROUP_EGRESS",
-	"IPV6DISABLED",
-	"NEIGH_CREATEFAIL",
-	"NEIGH_FAILED",
-	"NEIGH_QUEUEFULL",
-	"NEIGH_DEAD",
-	"TC_EGRESS",
-	"QDISC_DROP",
-	"CPU_BACKLOG",
-	"XDP",
-	"TC_INGRESS",
-	"UNHANDLED_PROTO",
-	"SKB_CSUM",
-	"SKB_GSO_SEG",
-	"SKB_UCOPY_FAULT",
-	"DEV_HDR",
-	"DEV_READY",
-	"FULL_RING",
-	"NOMEM",
-	"HDR_TRUNC",
-	"TAP_FILTER",
-	"TAP_TXFILTER",
-	"ICMP_CSUM",
-       	"INVALID_PROTO",
-	"IP_INADDRERRORS",
-	"IP_INNOROUTES",
-	"PKT_TOO_BIG",
-	"MAX",
+#include <linux/btf.h>
+
+struct btf_enum64 {
+        __u32   name_off;
+        __u32   val_lo32;
+        __u32   val_hi32;
 };
+
+#include <bpf/btf.h>
+
+static const char ** drop_reasons;
 
 static struct env {
 	int interval;
@@ -165,6 +108,24 @@ static void print_values(int map_fd)
 
 int main(int argc, char **argv)
 {
+	const char * const prefix = "SKB_DROP_REASON_";
+	const int prefixlen = strlen(prefix);
+
+	struct btf* kernel_btf = btf__load_vmlinux_btf();
+	__s32 drop_reason_id = btf__find_by_name(kernel_btf, "skb_drop_reason");
+	const struct btf_type* drop_reason = btf__type_by_id(kernel_btf, drop_reason_id);
+	const struct btf_enum* e = btf_enum(drop_reason);
+	const int num_reasons = btf_vlen(drop_reason);
+
+	drop_reasons = calloc(num_reasons, sizeof(char *));
+
+	for (int i = 0; i < num_reasons; e++, i++) {
+		const char *type_name = btf__str_by_offset(kernel_btf, e->name_off);
+		if (strncmp(type_name, prefix, prefixlen) == 0)
+			type_name += prefixlen;
+		drop_reasons[e->val] = type_name;
+	}
+
 	struct skb_drops_bpf *skel;
 	int err;
 
