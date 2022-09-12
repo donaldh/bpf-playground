@@ -84,7 +84,7 @@ $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) | $(OUTPUT)
 
 
 # Generate vmlinux.h from kernel BTF
-$(VMLINUX):	$(OUTPUT)
+$(VMLINUX):	| $(OUTPUT)
 	$(call msg,BTF,$@)
 	$(Q)$(BPFTOOL) btf dump file $(SYS_BTF_VMLINUX) format c > $@
 
