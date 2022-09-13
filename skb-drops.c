@@ -106,18 +106,33 @@ static void print_values(int map_fd)
 }
 
 
-int main(int argc, char **argv)
-{
+static bool init_drop_reasons() {
 	const char * const prefix = "SKB_DROP_REASON_";
 	const int prefixlen = strlen(prefix);
 
 	struct btf* kernel_btf = btf__load_vmlinux_btf();
+	if (!kernel_btf) {
+		fprintf(stderr, "Failed to load kernel btf\n");
+		return false;
+	}
 	__s32 drop_reason_id = btf__find_by_name(kernel_btf, "skb_drop_reason");
+	if (drop_reason_id < 0) {
+		perror("Failed to look up id for skb_drop_reason");
+		return false;
+	}
 	const struct btf_type* drop_reason = btf__type_by_id(kernel_btf, drop_reason_id);
+	if (!drop_reason) {
+		perror("Failed to get type information for skb_drop_reason");
+		return false;
+	}
 	const struct btf_enum* e = btf_enum(drop_reason);
 	const int num_reasons = btf_vlen(drop_reason);
 
 	drop_reasons = calloc(num_reasons, sizeof(char *));
+	if (!drop_reasons) {
+		perror("Failed to allocate memory for skb_drop_reason");
+		return false;
+	}
 
 	for (int i = 0; i < num_reasons; e++, i++) {
 		const char *type_name = btf__str_by_offset(kernel_btf, e->name_off);
@@ -126,8 +141,18 @@ int main(int argc, char **argv)
 		drop_reasons[e->val] = type_name;
 	}
 
+	return true;
+}
+
+
+int main(int argc, char **argv)
+{
 	struct skb_drops_bpf *skel;
 	int err;
+
+	if (!init_drop_reasons()) {
+		return 1;
+	}
 
 	/* Parse command line arguments */
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
