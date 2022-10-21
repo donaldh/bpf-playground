@@ -139,6 +139,8 @@ static bool init_drop_reasons() {
 		if (strncmp(type_name, prefix, prefixlen) == 0)
 			type_name += prefixlen;
 		drop_reasons[e->val] = type_name;
+		if (env.verbose)
+			fprintf(stderr, "%24s = %d\n", type_name, e->val);
 	}
 
 	return true;
@@ -150,14 +152,14 @@ int main(int argc, char **argv)
 	struct skb_drops_bpf *skel;
 	int err;
 
-	if (!init_drop_reasons()) {
-		return 1;
-	}
-
 	/* Parse command line arguments */
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
+
+	if (!init_drop_reasons()) {
+		return 1;
+	}
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	/* Set up libbpf errors and debug info callback */
