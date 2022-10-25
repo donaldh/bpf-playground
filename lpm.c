@@ -115,6 +115,8 @@ static void print_values(int map_fd)
 			break;
 		}
 
+		/* Use key and value here */
+
 		struct in_addr src_addr = {
 			.s_addr = next_key.data
 		};
@@ -126,6 +128,14 @@ static void print_values(int map_fd)
 	}
 }
 
+static int add_prefix_entry(int lpm_fd, __u32 addr, __u32 prefixlen, struct value *value)
+{
+	struct ipv4_lpm_key ipv4_key = {
+		.prefixlen = prefixlen,
+		.data = addr
+	};
+	return bpf_map_update_elem(lpm_fd, &ipv4_key, value, BPF_NOEXIST);
+}
 
 int main(int argc, char **argv)
 {
@@ -161,44 +171,39 @@ int main(int argc, char **argv)
 
 	/* Add some sample prefixes */
 	int lpm_fd = bpf_map__fd(skel->maps.ipv4_lpm_map);
-        struct ipv4_lpm_key ipv4_key = {
-		.prefixlen = 0
-	};
+
         struct value value = {};
-	inet_pton(AF_INET, "0.0.0.0", &ipv4_key.data);
-	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
+	__u32 data;
+	inet_pton(AF_INET, "0.0.0.0", &data);
+	err = add_prefix_entry(lpm_fd, data, 0, &value);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	ipv4_key.prefixlen = 8;
-	inet_pton(AF_INET, "10.0.0.0", &ipv4_key.data);
-	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
+	inet_pton(AF_INET, "10.0.0.0", &data);
+	err = add_prefix_entry(lpm_fd, data, 8, &value);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	ipv4_key.prefixlen = 16;
-	inet_pton(AF_INET, "192.168.0.0", &ipv4_key.data);
-	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
+	inet_pton(AF_INET, "192.168.0.0", &data);
+	err = add_prefix_entry(lpm_fd, data, 16, &value);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	ipv4_key.prefixlen = 24;
-	inet_pton(AF_INET, "10.11.2.0", &ipv4_key.data);
-	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
+	inet_pton(AF_INET, "10.11.2.0", &data);
+	err = add_prefix_entry(lpm_fd, data, 24, &value);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	ipv4_key.prefixlen = 32;
-	inet_pton(AF_INET, "10.11.2.2", &ipv4_key.data);
-	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
+	inet_pton(AF_INET, "10.11.2.2", &data);
+	err = add_prefix_entry(lpm_fd, data, 32, &value);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;

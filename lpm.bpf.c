@@ -10,10 +10,10 @@
 
 struct {
 	__uint(type, BPF_MAP_TYPE_LPM_TRIE);
-	__uint(max_entries, 255);
 	__type(key, struct ipv4_lpm_key);
 	__type(value, struct value);
 	__uint(map_flags, BPF_F_NO_PREALLOC);
+	__uint(max_entries, 255);
 } ipv4_lpm_map SEC(".maps");
 
 
