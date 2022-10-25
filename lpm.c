@@ -95,19 +95,20 @@ static void sig_handler(int sig)
 
 static void print_values(int map_fd)
 {
-	struct lpm_ipv4_key *cur_key = NULL;
-        struct lpm_ipv4_key next_key;
-	int next;
-	do {
-		next = bpf_map_get_next_key(map_fd, cur_key, &next_key);
-		if (next == -ENOENT)
+	struct ipv4_lpm_key *cur_key = NULL;
+        struct ipv4_lpm_key next_key;
+	struct value value;
+	int err;
+
+	for (;;) {
+		err = bpf_map_get_next_key(map_fd, cur_key, &next_key);
+		if (err == -ENOENT)
 			break;
-		if (next < 0) {
-			fprintf(stderr, "bpf_map_get_next_key %d returned %s\n", map_fd, strerror(-next));
+		if (err < 0) {
+			fprintf(stderr, "bpf_map_get_next_key %d returned %s\n", map_fd, strerror(-err));
 			break;
 		}
 
-		struct value value;
 		int ret = bpf_map_lookup_elem(map_fd, &next_key, &value);
 		if (ret < 0) {
 			fprintf(stderr, "Failed to lookup elem with key %d: %s\n", next_key.data, strerror(-ret));
@@ -119,10 +120,10 @@ static void print_values(int map_fd)
 		};
 		char *prefix_ip = inet_ntoa(src_addr);
 
-		printf("%16s/%-2d: %12lld packets, %12lld bytes\n", prefix_ip, next_key.trie_key.prefixlen, value.packets, value.bytes);
+		printf("%16s/%-2d: %12lld packets, %12lld bytes\n", prefix_ip, next_key.prefixlen, value.packets, value.bytes);
 
 		cur_key = &next_key;
-	} while (next == 0);
+	}
 }
 
 
@@ -159,51 +160,51 @@ int main(int argc, char **argv)
 	}
 
 	/* Add some sample prefixes */
-	int stats_fd = bpf_map__fd(skel->maps.lpm_ipv4);
-        struct lpm_ipv4_key key_ipv4 = {
-		.trie_key.prefixlen = 0
+	int lpm_fd = bpf_map__fd(skel->maps.ipv4_lpm_map);
+        struct ipv4_lpm_key ipv4_key = {
+		.prefixlen = 0
 	};
         struct value value = {};
-	inet_pton(AF_INET, "0.0.0.0", &key_ipv4.data);
-	err = bpf_map_update_elem(stats_fd, &key_ipv4, &value, 0);
+	inet_pton(AF_INET, "0.0.0.0", &ipv4_key.data);
+	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	key_ipv4.trie_key.prefixlen = 8;
-	inet_pton(AF_INET, "10.0.0.0", &key_ipv4.data);
-	err = bpf_map_update_elem(stats_fd, &key_ipv4, &value, 0);
+	ipv4_key.prefixlen = 8;
+	inet_pton(AF_INET, "10.0.0.0", &ipv4_key.data);
+	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	key_ipv4.trie_key.prefixlen = 16;
-	inet_pton(AF_INET, "192.168.0.0", &key_ipv4.data);
-	err = bpf_map_update_elem(stats_fd, &key_ipv4, &value, 0);
+	ipv4_key.prefixlen = 16;
+	inet_pton(AF_INET, "192.168.0.0", &ipv4_key.data);
+	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	key_ipv4.trie_key.prefixlen = 24;
-	inet_pton(AF_INET, "10.11.2.0", &key_ipv4.data);
-	err = bpf_map_update_elem(stats_fd, &key_ipv4, &value, 0);
+	ipv4_key.prefixlen = 24;
+	inet_pton(AF_INET, "10.11.2.0", &ipv4_key.data);
+	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-	key_ipv4.trie_key.prefixlen = 32;
-	inet_pton(AF_INET, "10.11.2.2", &key_ipv4.data);
-	err = bpf_map_update_elem(stats_fd, &key_ipv4, &value, 0);
+	ipv4_key.prefixlen = 32;
+	inet_pton(AF_INET, "10.11.2.2", &ipv4_key.data);
+	err = bpf_map_update_elem(lpm_fd, &ipv4_key, &value, 0);
         if (err) {
 		fprintf(stderr, "Failed to add prefix to lpm\n");
 		goto cleanup;
         }
 
-        int prog_fd = bpf_program__fd(skel->progs.count_by_prefix);
+        int prog_fd = bpf_program__fd(skel->progs.tc_counter);
 	LIBBPF_OPTS(bpf_tc_hook, hook,
 		    .ifindex = env.ifindex,
 		    .attach_point = BPF_TC_INGRESS);
@@ -237,7 +238,7 @@ int main(int argc, char **argv)
 
 		printf("\033[H\033[JPacket stats by prefix\n\n");
 
-		print_values(stats_fd);
+		print_values(lpm_fd);
 	}
 
 cleanup:

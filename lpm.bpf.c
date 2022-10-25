@@ -11,29 +11,38 @@
 struct {
 	__uint(type, BPF_MAP_TYPE_LPM_TRIE);
 	__uint(max_entries, 255);
-	__type(key, struct lpm_ipv4_key);
+	__type(key, struct ipv4_lpm_key);
 	__type(value, struct value);
 	__uint(map_flags, BPF_F_NO_PREALLOC);
-} lpm_ipv4 SEC(".maps");
+} ipv4_lpm_map SEC(".maps");
 
+
+void *lookup(__u32 ipaddr)
+{
+        struct ipv4_lpm_key key = {
+		.prefixlen = 32,
+		.data = ipaddr
+	};
+
+	return bpf_map_lookup_elem(&ipv4_lpm_map, &key);
+}
+
+void count_by_prefix(struct iphdr *ip, __u32 len) {
+	struct value *value = lookup(ip->daddr);
+        if (value) {
+		__sync_fetch_and_add(&value->packets, 1);
+		__sync_fetch_and_add(&value->bytes, len);
+        }
+}
 
 SEC("tc")
-int count_by_prefix(struct __sk_buff *skb) {
+int tc_counter(struct __sk_buff *skb) {
 	struct iphdr ip;
 
 	if (bpf_skb_load_bytes(skb, ETH_HLEN, &ip, sizeof(ip)) < 0)
 		return 0;
 
-        struct lpm_ipv4_key key = {
-		.trie_key.prefixlen = 32,
-		.data = ip.daddr
-	};
-
-	struct value *value = bpf_map_lookup_elem(&lpm_ipv4, &key);
-        if (value) {
-		__sync_fetch_and_add(&value->packets, 1);
-		__sync_fetch_and_add(&value->bytes, skb->len);
-        }
+	count_by_prefix(&ip, skb->len);
 
         return 0;
 }

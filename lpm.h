@@ -3,8 +3,8 @@
 #ifndef __PACKETSTAT_H
 #define __PACKETSTAT_H
 
-struct lpm_ipv4_key {
-	struct bpf_lpm_trie_key trie_key;
+struct ipv4_lpm_key {
+	__u32 prefixlen;
         union {
 		__u32 data;
 		__u8 octets[4];
