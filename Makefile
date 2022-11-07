@@ -13,7 +13,7 @@ INCLUDES := -I$(OUTPUT)
 CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) -lbpf
 
-APPS = packetstat protostat tccounter skb-drops lpm bloom
+APPS = packetstat protostat tccounter skb-drops lpm bloom queue-stack
 
 # Get Clang's default includes on this system. We'll explicitly add these dirs
 # to the includes list when compiling with `-target bpf` because otherwise some
