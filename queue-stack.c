@@ -195,6 +195,7 @@ int main(int argc, char **argv)
 	add_ipv4(queue_fd, "10.11.2.3");
 	add_ipv4(queue_fd, "10.11.2.4");
 	add_ipv4(queue_fd, "10.11.2.5");
+	add_ipv4(queue_fd, "10.11.2.6");
 
 	pop(queue_fd, "queue");
 	peek(queue_fd, "queue");
@@ -205,6 +206,7 @@ int main(int argc, char **argv)
 	add_ipv4(stack_fd, "10.11.1.3");
 	add_ipv4(stack_fd, "10.11.1.4");
 	add_ipv4(stack_fd, "10.11.1.5");
+	add_ipv4(stack_fd, "10.11.1.6");
 
 	pop(stack_fd, "stack");
 	peek(stack_fd, "stack");

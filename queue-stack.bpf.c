@@ -12,13 +12,13 @@
 struct {
         __uint(type, BPF_MAP_TYPE_QUEUE);
         __type(value, struct ipv4_value);
-        __uint(max_entries, 10);
+        __uint(max_entries, 5);
 } queue SEC(".maps");
 
 struct {
         __uint(type, BPF_MAP_TYPE_STACK);
         __type(value, struct ipv4_value);
-        __uint(max_entries, 10);
+        __uint(max_entries, 5);
 } stack SEC(".maps");
 
 int take_one(__u32 *elem)
