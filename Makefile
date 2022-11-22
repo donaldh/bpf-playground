@@ -5,11 +5,13 @@ BPFTOOL ?= bpftool
 SYS_BTF_VMLINUX := /sys/kernel/btf/vmlinux
 VMLINUX := $(OUTPUT)/vmlinux.h
 
+LIBBPF ?= libbpf
+
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 # Use our own libbpf API headers and Linux UAPI headers distributed with
 # libbpf to avoid dependency on system-wide headers, which could be missing or
 # outdated
-INCLUDES := -I$(OUTPUT)
+INCLUDES := -I$(OUTPUT) -I$(LIBBPF)/include
 CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) -lbpf
 
