@@ -6,6 +6,8 @@ SYS_BTF_VMLINUX := /sys/kernel/btf/vmlinux
 VMLINUX := $(OUTPUT)/vmlinux.h
 
 LIBBPF ?= libbpf
+LIBBPF_OBJ=$(LIBBPF)/lib64/libbpf.a
+XDPTOOLS ?= ../xdp-tutorial/xdp-tools
 
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 # Use our own libbpf API headers and Linux UAPI headers distributed with
@@ -13,6 +15,7 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's
 # outdated
 INCLUDES := -I$(OUTPUT) -I$(LIBBPF)/include
 CFLAGS := -g -Wall
+EXTRA_LDFLAGS := -L$(LIBBPF)/lib64
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) -lbpf
 
 APPS = packetstat protostat tccounter skb-drops lpm bloom queue-stack map-o-maps sk-storage
@@ -75,7 +78,7 @@ $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT)
 # Build user-space code
 $(patsubst %,$(OUTPUT)/%.o,$(APPS)): %.o: %.skel.h
 
-$(OUTPUT)/%.o: %.c $(wildcard %.h) | $(OUTPUT)
+$(OUTPUT)/%.o: %.c $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
 
@@ -89,6 +92,10 @@ $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) | $(OUTPUT)
 $(VMLINUX):	| $(OUTPUT)
 	$(call msg,BTF,$@)
 	$(Q)$(BPFTOOL) btf dump file $(SYS_BTF_VMLINUX) format c > $@
+
+# Build and install libbpf from xdp-tutorial/xdp-tools
+$(LIBBPF_OBJ):
+	$(MAKE) -C $(XDPTOOLS)/lib/libbpf/src install PREFIX=`pwd`/libbpf
 
 # delete failed targets
 .DELETE_ON_ERROR:
