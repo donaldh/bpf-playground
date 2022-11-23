@@ -15,12 +15,6 @@
 
 #include "map-o-maps.skel.h"
 
-struct btf_enum64 {
-        __u32   name_off;
-        __u32   val_lo32;
-        __u32   val_hi32;
-};
-
 #include <bpf/btf.h>
 
 static struct env {

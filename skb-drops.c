@@ -12,13 +12,6 @@
 #include "skb-drops.skel.h"
 
 #include <linux/btf.h>
-
-struct btf_enum64 {
-        __u32   name_off;
-        __u32   val_lo32;
-        __u32   val_hi32;
-};
-
 #include <bpf/btf.h>
 
 static const char ** drop_reasons;
