@@ -133,10 +133,10 @@ int create_bloom()
 			      &opts);		 /* create options */
 }
 
-int bloom_fd;
-int add_element(__u32 value)
+int add_element(struct bpf_map *bloom_map, __u32 value)
 {
-	return bpf_map_update_elem(bloom_fd, 0, &value, BPF_ANY);
+	int bloom_fd = bpf_map__fd(bloom_map);
+	return bpf_map_update_elem(bloom_fd, NULL, &value, BPF_ANY);
 }
 
 int main(int argc, char **argv)
