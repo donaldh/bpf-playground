@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2022 Red Hat */
-#ifndef __PACKETSTAT_H
-#define __PACKETSTAT_H
+#ifndef __PROTOSTAT_H
+#define __PROTOSTAT_H
 
 struct key {
 	union {
@@ -15,4 +15,4 @@ struct value {
 	__u64 bytes;
 };
 
-#endif /* __PACKETSTAT_H */
+#endif /* __PROTOSTAT_H */

@@ -11,7 +11,6 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #include <linux/if_link.h>
-#include "packetstat.h"
 #include <bpf/bpf.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
