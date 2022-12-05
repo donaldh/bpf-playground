@@ -8,73 +8,53 @@
 #include <linux/tcp.h>
 #include <arpa/inet.h>
 
-#include "tccounter.h"
+#include "sk-storage.h"
 
 struct {
-	__uint(type, BPF_MAP_TYPE_LRU_HASH);
-	__uint(max_entries, 32);
-	__type(key, struct key);
-	__type(value, struct value);
-} packet_stats SEC(".maps");
+	__uint(type, BPF_MAP_TYPE_SK_STORAGE);
+	__uint(map_flags, BPF_F_NO_PREALLOC);
+	__type(key, int);
+	__type(value, struct tcp_metrics);
+} socket_storage SEC(".maps");
 
-struct {
-	__uint(type, BPF_MAP_TYPE_XSKMAP);
-	__type(key, __u32);
-	__type(value, __u32);
-	__uint(max_entries, 32);
-} my_xsks SEC(".maps");
 
-SEC("xdp")
-int redir_prog(struct xdp_md *ctx)
+SEC("sockops")
+int _sockops(struct bpf_sock_ops *ctx)
 {
-	int index = ctx->rx_queue_index;
-	return bpf_redirect_map(&my_xsks, index, 0);
-}
+	struct tcp_metrics *storage;
+	struct bpf_tcp_sock *tcp_sk;
+	int op = (int) ctx->op;
+	struct bpf_sock *sk;
 
-static inline void count_by_srcip(__u32 srcip, int bytes)
-{
-	struct key key = {
-		.srcip = srcip
-	};
-	struct value *value = bpf_map_lookup_elem(&packet_stats, &key);
-	if (value) {
-		__sync_fetch_and_add(&value->packets, 1);
-		__sync_fetch_and_add(&value->bytes, bytes);
-	} else {
-		struct value newval = { 1, bytes };
-		bpf_map_update_elem(&packet_stats, &key, &newval, BPF_NOEXIST);
+	sk = ctx->sk;
+	if (!sk)
+		return 1;
+
+	storage = bpf_sk_storage_get(&socket_storage, sk, 0,
+				     BPF_SK_STORAGE_GET_F_CREATE);
+	if (!storage)
+		return 1;
+
+	if (op == BPF_SOCK_OPS_TCP_CONNECT_CB) {
+		bpf_sock_ops_cb_flags_set(ctx, BPF_SOCK_OPS_RTT_CB_FLAG);
+		return 1;
 	}
-}
 
-SEC("tc")
-int count_packets(struct __sk_buff *skb)
-{
-        const int l3_off = ETH_HLEN;
-        const int l4_off = l3_off + sizeof(struct iphdr);
-        const int tcp_end = l4_off + sizeof(struct tcphdr);
+	if (op != BPF_SOCK_OPS_RTT_CB)
+		return 1;
 
-        void *data = (void*)(long)skb->data;
-        void *data_end = (void*)(long)skb->data_end;
-        if (data_end < data + l4_off)
-                return BPF_OK;
+	tcp_sk = bpf_tcp_sock(sk);
+	if (!tcp_sk)
+		return 1;
 
-        struct ethhdr *eth = data;
-        if (eth->h_proto != htons(ETH_P_IP))
-                return BPF_OK;
+	storage->invoked++;
 
-        struct iphdr *ip = (struct iphdr *)(data + l3_off);
-        if (ip->protocol != IPPROTO_TCP)
-                return BPF_OK;
+	storage->dsack_dups = tcp_sk->dsack_dups;
+	storage->delivered = tcp_sk->delivered;
+	storage->delivered_ce = tcp_sk->delivered_ce;
+	storage->icsk_retransmits = tcp_sk->icsk_retransmits;
 
-        struct tcphdr *tcph = (struct tcphdr *)(ip + 1);
-
-        if (data_end < data + tcp_end)
-                return BPF_OK;
-
-        __u32 saddr = ip->saddr;
-	count_by_srcip(saddr, skb->data_end - skb->data);
-
-	return BPF_OK;
+	return 1;
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

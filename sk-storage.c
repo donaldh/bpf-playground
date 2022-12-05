@@ -9,36 +9,34 @@
 #include <bpf/libbpf.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <net/if.h>
 #include <linux/if_link.h>
-#include "packetstat.h"
+#include <netinet/tcp.h>
 #include <bpf/bpf.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <fcntl.h>
+#include <netdb.h>
 
-#include "tccounter.skel.h"
-#include "tccounter.h"
+#include "sk-storage.skel.h"
+#include "sk-storage.h"
 
 static struct env {
-	char ifname[IF_NAMESIZE];
-	int ifindex;
-	int interval;
 	bool verbose;
-} env = { "", -1, 1, 0 };
+} env = { 0 };
 
-const char *argp_program_version = "tccounter 0.0";
+const char *argp_program_version = "sk-storage 0.0";
 const char *argp_program_bug_address = "<donald.hunter@redhat.com>";
 const char argp_program_doc[] =
-"BPF tccounter demo application.\n"
+"BPF sk-storage demo application.\n"
 "\n"
-"Trace packets at the tc hook and report packet statistics.\n"
+"Trace socket operations.\n"
 "\n"
-"USAGE: ./tccounter [-v]\n";
+"USAGE: ./sk-storage [-v]\n";
 
 static const struct argp_option opts[] = {
-	{ "device", 'd', "ifname", 0, "Attach to device" },
-	{ "interval", 'i', "seconds", 0, "Interval between reports" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
 };
@@ -46,23 +44,6 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	switch (key) {
-	case 'd':
-		if (strlen(arg) >= IF_NAMESIZE) {
-			fprintf(stderr, "ERR: --device name too long\n");
-			return ARGP_ERR_UNKNOWN;
-		}
-		strncpy(env.ifname, arg, IF_NAMESIZE);
-		env.ifindex = if_nametoindex(env.ifname);
-		if (env.ifindex == 0) {
-			fprintf(stderr,
-				"ERR: --device name unknown err(%d):%s\n",
-				errno, strerror(errno));
-			return ARGP_ERR_UNKNOWN;
-		}
-		break;
-	case 'i':
-		env.interval = atoi(arg);
-		break;
 	case 'v':
 		env.verbose = true;
 		break;
@@ -95,46 +76,142 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
-static void print_values(int map_fd)
+const char *foo = "/sys/fs/cgroup/foo";
+const char *foo_procs = "/sys/fs/cgroup/foo/cgroup.procs";
+
+static void join_cgroup()
 {
-	struct key *cur_key = NULL;
-	struct key next_key;
-	int next;
-	do {
-		next = bpf_map_get_next_key(map_fd, cur_key, &next_key);
-		if (next == -ENOENT)
-			break;
-		if (next < 0) {
-			fprintf(stderr, "bpf_map_get_next_key %d returned %s\n", map_fd, strerror(-next));
-			break;
-		}
+	if (mkdir(foo, 0777) && errno != EEXIST) {
+		fprintf(stderr, "Failed to create cgroup %s\n", foo);
+		exit(1);
+	}
 
-		struct in_addr src_addr = {
-			.s_addr = next_key.srcip
-		};
-		char *src_ip = inet_ntoa(src_addr);
+	int fd = open(foo_procs, O_WRONLY);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to open %s\n", foo_procs);
+		exit(1);
+	}
 
-		struct value value;
-		int ret = bpf_map_lookup_elem(map_fd, &next_key, &value);
-		if (ret < 0) {
-			fprintf(stderr, "Failed to lookup elem with key %s: %s\n", src_ip, strerror(-ret));
-			break;
-		}
-		printf("%s: %lld packets, %lld bytes\n", src_ip, value.packets, value.bytes);
-		cur_key = &next_key;
-	} while (next == 0);
+	pid_t pid = getpid();
+	if (dprintf(fd, "%d\n", pid) < 0) {
+		fprintf(stderr, "Failed to add %d to %s\n", pid, foo_procs);
+		exit(1);
+	}
+
+	close(fd);
 }
 
+static int get_cgroup() {
+	int fd = open(foo, O_RDONLY);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to open cgroup %s\n", foo);
+		exit(1);
+	}
+	return fd;
+}
+
+static void send_byte(int fd)
+{
+	char b = 0x55;
+
+	write(fd, &b, sizeof(b));
+}
+
+static int wait_for_ack(int fd, int retries)
+{
+	struct tcp_info info;
+	socklen_t optlen;
+	int i, err;
+
+	for (i = 0; i < retries; i++) {
+		optlen = sizeof(info);
+		err = getsockopt(fd, SOL_TCP, TCP_INFO, &info, &optlen);
+		if (err < 0) {
+			fprintf(stderr, "Failed to lookup TCP stats\n");
+			return err;
+		}
+		if (info.tcpi_unacked == 0)
+			return 0;
+
+		usleep(10);
+	}
+
+	fprintf(stderr, "Did not receive ACK\n");
+	return -1;
+}
+
+static int client_connect(const char* host, const char* service) {
+    int sock;
+
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* TCP socket */
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;           /* Any protocol */
+
+    int status = getaddrinfo(host, service, &hints, &result);
+    if (status != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+        exit(EXIT_FAILURE);
+    }
+
+    /* getaddrinfo() returns a list of address structures.
+       Try each address until we successfully connect(2).
+       If socket(2) (or connect(2)) fails, we (close the socket
+       and) try the next address. */
+
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        //print_addr(rp);
+
+        sock = socket(rp->ai_family, rp->ai_socktype,
+                      rp->ai_protocol);
+        if (sock == -1)
+            continue;
+
+        if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
+            break;                  /* Success */
+
+        close(sock);
+    }
+
+    freeaddrinfo(result);           /* No longer needed */
+
+    if (rp == NULL) {               /* No address succeeded */
+	    fprintf(stderr, "Could not connect to %s:%s\n", host, service);
+	    return -1;
+    }
+
+    return sock;
+}
+
+static void output(int map_fd, int client_fd)
+{
+	struct tcp_metrics val;
+
+	int err = bpf_map_lookup_elem(map_fd, &client_fd, &val);
+	if (err) {
+		fprintf(stderr, "Failed to lookup sk_storage\n");
+		return;
+	}
+
+	printf("invoked=%d, dsack_dups=%d, delivered=%d, delivered_ce=%d, icsk_retransmits=%d\n",
+	       val.invoked, val.dsack_dups, val.delivered, val.delivered_ce, val.icsk_retransmits);
+}
 
 int main(int argc, char **argv)
 {
-	struct tccounter_bpf *skel;
+	struct sk_storage_bpf *skel;
 	int err;
 
 	/* Parse command line arguments */
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
+
+	join_cgroup();
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	/* Set up libbpf errors and debug info callback */
@@ -145,68 +222,63 @@ int main(int argc, char **argv)
 	signal(SIGTERM, sig_handler);
 
 	/* Load and verify BPF application */
-	skel = tccounter_bpf__open();
+	skel = sk_storage_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "Failed to open and load BPF skeleton\n");
 		return 1;
 	}
 
 	/* Load & verify BPF programs */
-	err = tccounter_bpf__load(skel);
+	err = sk_storage_bpf__load(skel);
 	if (err) {
 		fprintf(stderr, "Failed to load and verify BPF skeleton\n");
 		goto cleanup;
 	}
 
-	/* Attach tracepoints */
-	err = tccounter_bpf__attach(skel);
+	/* Attach cgroup */
+	int prog_fd = bpf_program__fd(skel->progs._sockops);
+	int map_fd = bpf_map__fd(skel->maps.socket_storage);
+	int cgroup_fd = get_cgroup();
+	err = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS, 0);
 	if (err) {
-		fprintf(stderr, "Failed to attach BPF skeleton\n");
+		fprintf(stderr, "Failed to attach program to cgroup %s\n", foo);
 		goto cleanup;
 	}
 
-	int prog_fd = bpf_program__fd(skel->progs.count_packets);
-	int stats_fd = bpf_map__fd(skel->maps.packet_stats);
-
-        DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
-                            .ifindex = env.ifindex,
-                            .attach_point = BPF_TC_INGRESS);
-
-        DECLARE_LIBBPF_OPTS(bpf_tc_opts, opts,
-                            .flags = BPF_TC_F_REPLACE,
-                            .handle = 1,
-                            .priority = 1,
-                            .prog_fd = prog_fd);
-
-        err = bpf_tc_hook_create(&hook);
-        err = err == -EEXIST ? 0 : err;
-	if (err) {
-		fprintf(stderr, "Failed to create tc hook\n");
+	int client_fd = client_connect("localhost", "3456");
+	if (client_fd < 0) {
+		fprintf(stderr, "Failed to open inet socket\n");
+		fprintf(stderr, "\n");
+		fprintf(stderr, "Run socat -v tcp-l:3456,fork exec:'/bin/cat' as an echo server.\n");
+		fprintf(stderr, "\n");
 		goto cleanup;
 	}
 
-        err = bpf_tc_attach(&hook, &opts);
+	struct tcp_metrics value = { };
+	err = bpf_map_update_elem(map_fd, &client_fd, &value, BPF_ANY);
 	if (err) {
-		fprintf(stderr, "Failed to attach tc program\n");
+		fprintf(stderr, "Failed to create elem: %s\n", strerror(-err));
 		goto cleanup;
 	}
 
-        while (!exiting) {
-		err = sleep(env.interval);
-		/* Ctrl-C will cause -EINTR */
-		if (err == -EINTR) {
-			err = 0;
-			continue;
+	err = bpf_map_delete_elem(map_fd, &client_fd);
+	if (err) {
+		fprintf(stderr, "Failed to update elem: %s\n", strerror(-err));
+		goto cleanup;
+	}
+
+	int i = 0;
+	while (i++ < 2) {
+		send_byte(client_fd);
+		if (wait_for_ack(client_fd, 100) < 0) {
+			goto cleanup;
 		}
-
-                printf("\033[H\033[JIncoming packets on %s\n\n", env.ifname);
-
-		print_values(stats_fd);
+		output(map_fd, client_fd);
 	}
 
 cleanup:
 	/* Clean up */
-	tccounter_bpf__destroy(skel);
+	sk_storage_bpf__destroy(skel);
 
 	return err < 0 ? -err : 0;
 }
