@@ -31,7 +31,7 @@ int _sockops(struct bpf_sock_ops *ctx)
 		return 1;
 
 	storage = bpf_sk_storage_get(&socket_storage, sk, 0,
-				     BPF_SK_STORAGE_GET_F_CREATE);
+				     BPF_LOCAL_STORAGE_GET_F_CREATE);
 	if (!storage)
 		return 1;
 
