@@ -11,13 +11,6 @@
 #include <linux/udp.h>
 #include "dns-trace.h"
 
-struct net_dev_queue_args {
-	unsigned long long pad;
-	void *skbaddr;
-	unsigned int len;
-	__u32 name;
-};
-
 struct dns_header
 {
 	__u16 id;
@@ -52,6 +45,10 @@ struct {
 struct sk_buff {
 	unsigned char *data;
 	unsigned int len;
+} __attribute__((preserve_access_index));
+
+struct trace_event_raw_net_dev_template {
+	void *skbaddr;
 } __attribute__((preserve_access_index));
 
 static inline int do_trace(struct sk_buff *skb)
@@ -144,8 +141,8 @@ static inline int do_trace(struct sk_buff *skb)
 
 
 SEC("tracepoint/net/net_dev_queue")
-int trace_net_packets(struct net_dev_queue_args *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) ctx->skbaddr;
+int trace_net_packets(struct trace_event_raw_net_dev_template *ctx) {
+	struct sk_buff *skb = BPF_CORE_READ(ctx, skbaddr);
 	do_trace(skb);
 
 	return BPF_OK;
