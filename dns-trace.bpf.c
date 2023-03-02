@@ -48,13 +48,11 @@ struct sk_buff {
 } __attribute__((preserve_access_index));
 
 struct trace_event_raw_net_dev_template {
-	void *skbaddr;
+	struct sk_buff *skbaddr;
 } __attribute__((preserve_access_index));
 
-static inline int do_trace(struct sk_buff *skb)
+static inline int do_trace(unsigned char *data, unsigned int len)
 {
-	unsigned char *data = BPF_CORE_READ(skb, data);
-	unsigned int len = BPF_CORE_READ(skb, len);
 	unsigned char *end = data + len;
 
 	struct ethhdr eth;
@@ -142,8 +140,10 @@ static inline int do_trace(struct sk_buff *skb)
 
 SEC("tracepoint/net/net_dev_queue")
 int trace_net_packets(struct trace_event_raw_net_dev_template *ctx) {
-	struct sk_buff *skb = BPF_CORE_READ(ctx, skbaddr);
-	do_trace(skb);
+	unsigned char *data = BPF_CORE_READ(ctx, skbaddr, data);
+	unsigned int len = BPF_CORE_READ(ctx, skbaddr, len);
+
+	do_trace(data, len);
 
 	return BPF_OK;
 }
