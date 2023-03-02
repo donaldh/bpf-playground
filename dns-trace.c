@@ -16,6 +16,11 @@
 #include <linux/btf.h>
 #include <bpf/btf.h>
 
+#include <resolv.h>
+#include <arpa/inet.h>
+#include <arpa/nameser.h>
+#include <netinet/in.h>
+
 static struct env {
 	int interval;
 	bool verbose;
@@ -72,6 +77,124 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
+const char *rcode_names[] = {
+	"NOERROR",
+	"FORMERR",
+	"SERVFAIL",
+	"NXDOMAIN",
+	"NOTIMP",
+	"REFUSED",
+	"YXDOMAIN",
+	"YXRRSET",
+	"NXRRSET",
+	"NOTAUTH",
+	"NOTZONE",
+	"ns_r_max"
+};
+
+const char * rcode_name(ns_rcode code)
+{
+	static char buffer[10];
+	if (code > ns_r_max) {
+		snprintf(buffer, 10, "%d", code);
+		return buffer;
+	} else {
+		return rcode_names[code];
+	}
+}
+
+const char *type_names[] = {
+	"invalid",
+	"A",
+	"NS",
+	"MD",
+	"MF",
+	"CNAME",
+	"SOA",
+	"MB",
+	"MG",
+	"MR",
+	"NULL",
+	"WKS",
+	"PTR",
+	"HINFO",
+	"MINFO",
+	"MX",
+	"TXT",
+	"RP",
+	"AFSDB",
+	"X25",
+	"ISDN",
+	"RT",
+	"NSAP",
+	"NSAP_PTR",
+	"SIG",
+	"KEY",
+	"PX",
+	"GPOS",
+	"AAAA",
+	"LOC",
+	"NIMLOC",
+	"SRV"
+};
+
+static const char *type_name(ns_type type)
+{
+	static char buffer[10];
+	if (type > ns_t_srv) {
+		snprintf(buffer, 10, "%d", type);
+		return buffer;
+	} else {
+		return type_names[type];
+	}
+}
+
+static int print_records(bool q, ns_msg *msg, const char *name, ns_sect section)
+{
+	int i;
+	for (i = 0; i < ns_msg_count(*msg, section); i++) {
+		char data[100] = { 0 };
+		ns_rr rr;
+		int err = ns_parserr(msg, section, i, &rr);
+		if (err) {
+			perror("ns_parserr");
+			return 1;
+		}
+
+		if (q) {
+			printf("%s: %5s %s\n",
+			       name,  type_name(ns_rr_type(rr)), ns_rr_name(rr));
+		} else {
+			const char *rdata = (const char *) ns_rr_rdata(rr);
+			int rdlen = ns_rr_rdlen(rr);
+			switch (ns_rr_type(rr)) {
+			case ns_t_a:
+				if (rdlen == NS_INADDRSZ)
+					inet_ntop(AF_INET, rdata, data, sizeof(data));
+				break;
+			case ns_t_aaaa:
+				if (rdlen == NS_IN6ADDRSZ)
+					inet_ntop(AF_INET6, rdata, data, sizeof(data));
+				break;
+			case ns_t_txt:
+				int len = *rdata++;
+				strncpy(data, rdata, len);
+				data[len] = 0;
+				break;
+			default:
+				break;
+			}
+			printf("%s: %5s %s [%s] ttl %ds\n",
+			       name,
+			       type_name(ns_rr_type(rr)),
+			       ns_rr_name(rr),
+			       data,
+			       ns_rr_ttl(rr));
+		}
+	}
+	return 0;
+}
+
 static int process_event(void *ctx, void *data, size_t len)
 {
 	if (sizeof(struct dns_event) > len) {
@@ -79,8 +202,29 @@ static int process_event(void *ctx, void *data, size_t len)
 		return 1;
 	}
 	struct dns_event *event = (struct dns_event *) data;
+	double latency_ms = ((double)event->duration) / 1000000;
+	fprintf(stderr, "Received dns event id=%04x flags=%04x latency=%.3fms\n",
+		event->id, event->flags, latency_ms);
 
-	fprintf(stderr, "Received dns event id=%x\n", event->id);
+	ns_msg msg;
+	int err = ns_initparse(event->payload, event->length, &msg);
+	if (err) {
+		perror("ns_initparse");
+		return 1;
+	}
+	printf("%s – q: %d, a: %d, ns: %d, ar: %d, rcode: %s\n",
+	       ns_msg_getflag(msg, ns_f_qr) ? "R" : "Q",
+	       ns_msg_count(msg, ns_s_qd),
+	       ns_msg_count(msg, ns_s_an),
+	       ns_msg_count(msg, ns_s_ns),
+	       ns_msg_count(msg, ns_s_ar),
+	       rcode_name(ns_msg_getflag(msg, ns_f_rcode)));
+
+	print_records(true, &msg, " Q", ns_s_qd);
+	print_records(false, &msg, " A", ns_s_an);
+	print_records(false, &msg, "NS", ns_s_ns);
+	print_records(false, &msg, "AR", ns_s_ar);
+
 	return 0;
 }
 
@@ -102,7 +246,7 @@ int main(int argc, char **argv)
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
 
-	/* Load and verify BPF application */
+	/* Load and verify BPF object file */
 	skel = dns_trace_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "Failed to open and load BPF skeleton\n");

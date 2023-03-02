@@ -16,7 +16,7 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's
 INCLUDES := -I$(OUTPUT) -I$(LIBBPF)/include
 CFLAGS := -g -Wall
 EXTRA_LDFLAGS := -L$(LIBBPF)/lib64
-ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) -lbpf
+ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) -lbpf -lresolv
 
 APPS = packetstat protostat tccounter skb-drops lpm bloom queue-stack map-o-maps sk-storage dns-trace
 
