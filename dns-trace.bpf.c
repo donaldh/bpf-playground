@@ -102,9 +102,10 @@ static inline int do_trace(unsigned char *data, unsigned int len)
 
 		struct request_val newval = {};
 
+#ifdef DEBUG
 		char format[] = "dns-trace: found DNS packet: id=0x%x, flags=0x%04x\n";
 		bpf_trace_printk(format, sizeof(format), bpf_ntohs(dns.id), bpf_ntohs(dns.flags));
-
+#endif
 		if ((dns.flags & 0x80) == 0) { // query
 			if (bpf_map_lookup_elem(&requests, &req_key) == NULL) { // only interested in first query packet with id
 				newval.ts = bpf_ktime_get_ns();
@@ -127,9 +128,10 @@ static inline int do_trace(unsigned char *data, unsigned int len)
 
 				bpf_ringbuf_submit(evt, 0);
 				bpf_map_delete_elem(&requests, &req_key);
-
+#ifdef DEBUG
 				char format[] = "dns-trace: dns_event added to ringbuf\n";
 				bpf_trace_printk(format, sizeof(format));
+#endif
 			}
 		}
 	}
