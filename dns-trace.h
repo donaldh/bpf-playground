@@ -7,6 +7,7 @@
 
 #define IFNAMSIZ 16
 #define MAXMSG 512
+#define MAXNAME 255
 
 struct dns_event {
 	__u64 duration;

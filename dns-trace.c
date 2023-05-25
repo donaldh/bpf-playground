@@ -213,14 +213,14 @@ static int process_event(void *ctx, void *data, size_t len)
 		return 1;
 	}
 	printf("%s – q: %d, a: %d, ns: %d, ar: %d, rcode: %s\n",
-	       ns_msg_getflag(msg, ns_f_qr) ? "R" : "Q",
+	       ns_msg_getflag(msg, ns_f_qr) ? "Reply" : "Query",
 	       ns_msg_count(msg, ns_s_qd),
 	       ns_msg_count(msg, ns_s_an),
 	       ns_msg_count(msg, ns_s_ns),
 	       ns_msg_count(msg, ns_s_ar),
 	       rcode_name(ns_msg_getflag(msg, ns_f_rcode)));
 
-	print_records(true, &msg, " Q", ns_s_qd);
+	print_records(true,  &msg, " Q", ns_s_qd);
 	print_records(false, &msg, " A", ns_s_an);
 	print_records(false, &msg, "NS", ns_s_ns);
 	print_records(false, &msg, "AR", ns_s_ar);
