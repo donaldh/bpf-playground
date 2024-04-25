@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iperf3
+  labels:
+    app: iperf3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iperf3
+  template:
+    metadata:
+      labels:
+        app: iperf3
+    spec:
+      imagePullSecrets:
+        - name: donhunte-donaldh-kind-pull-secret
+      containers:
+      - name: iperf3
+        image: quay.io/donhunte/iperf3
+        command: ['iperf3', '-s']
+        ports:
+        - containerPort: 5201
+          protocol: TCP
+          name: server
+        - containerPort: 5201
+          protocol: UDP
+          name: udpserver
+      terminationGracePeriodSeconds: 0
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf3
+  annotations:
+    io.cilium/global-service: "true"
+spec:
+  selector:
+    app: iperf3
+  ports:
+  - protocol: TCP
+    name: tcpserver
+    port: 5201
+    targetPort: server
+  - protocol: UDP
+    name: udpserver
+    port: 5201
+    targetPort: udpserver

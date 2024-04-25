@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: donhunte-donaldh-kind-pull-secret
+data:
+  .dockerconfigjson: ewogICJhdXRocyI6IHsKICAgICJxdWF5LmlvIjogewogICAgICAiYXV0aCI6ICJaRzl1YUhWdWRHVXJaRzl1WVd4a2FGOXJhVzVrT2taUVNGbEpUMDB6VDFWTE9GQkdRakl5TUU5VFUwWkRUMFZaTkROQlFsVlRORE5KVkV4SFdqVlBWbEJITTFsUE0xUkpTbEZSTkVSQ00wY3lVVms1TVVnPSIsCiAgICAgICJlbWFpbCI6ICIiCiAgICB9CiAgfQp9
+type: kubernetes.io/dockerconfigjson

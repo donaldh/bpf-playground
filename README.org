@@ -69,3 +69,14 @@ Report bugs to <donald.hunter@redhat.com>.
 $ make
 $ sudo ./tcounter -d eth0
 #+end_src
+
+** dns-trace
+
+#+begin_src sh :results output
+podman build -t dns -f container/Containerfile.dns .
+#+end_src
+
+#+begin_src sh :results output
+podman run --privileged --mount type=bind,source=/sys/kernel/debug,target=/sys/kernel/debug -ti localhost/dns ./dns-trace
+#+end_src
+

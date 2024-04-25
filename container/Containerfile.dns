@@ -1,0 +1,13 @@
+FROM fedora:38
+
+RUN dnf install -y \
+    clang llvm bpftool make elfutils-libelf-devel zstd \
+    glibc-devel glibc-devel.i686 libbpf bind-utils iproute
+
+RUN dnf install -y less
+
+COPY . /bpf-playground
+
+WORKDIR /bpf-playground
+
+RUN make
