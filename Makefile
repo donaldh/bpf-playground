@@ -53,7 +53,10 @@ $(call allow-override,CC,$(CROSS_COMPILE)cc)
 $(call allow-override,LD,$(CROSS_COMPILE)ld)
 
 .PHONY: all
-all: $(APPS)
+all: .clangd $(APPS)
+
+.clangd:	.clangd.tmpl
+	@sed -e "s?\$${PWD}?${PWD}?g" $< > $@
 
 .PHONY: clean
 clean:
