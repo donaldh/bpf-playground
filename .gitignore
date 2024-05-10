@@ -4,3 +4,13 @@
 .output/
 packetstat
 tccounter
+bloom
+dns-trace
+lpm
+lru
+lru-syscall
+map-o-maps
+protostat
+queue-stack
+sk-storage
+skb-drops
