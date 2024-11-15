@@ -15,6 +15,7 @@ struct kfree_skb_args {
 	unsigned long long pad;
 	void *skbaddr;
 	void *location;
+	void *rx_sk;
 	unsigned short protocol;
 	enum skb_drop_reason reason;
 };
