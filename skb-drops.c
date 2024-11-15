@@ -93,7 +93,12 @@ static void print_values(int map_fd)
 			fprintf(stderr, "Failed to lookup elem with key %d: %s\n", *cur_key, strerror(-ret));
 			break;
 		}
-		printf("%24s : %8llu drops\n", drop_reasons[next_key], value);
+		if ((next_key & 0xffff0000) == 0) {
+			printf("%24s : %8llu drops\n", drop_reasons[next_key], value);
+		} else {
+			printf("%24x : %8llu drops\n", next_key, value);
+		}
+
 		cur_key = &next_key;
 	} while (next == 0);
 }
@@ -131,7 +136,8 @@ static bool init_drop_reasons() {
 		const char *type_name = btf__str_by_offset(kernel_btf, e->name_off);
 		if (strncmp(type_name, prefix, prefixlen) == 0)
 			type_name += prefixlen;
-		drop_reasons[e->val] = type_name;
+		if (e->val >= 0 && e->val < num_reasons)
+			drop_reasons[e->val] = type_name;
 		if (env.verbose)
 			fprintf(stderr, "%24s = %d\n", type_name, e->val);
 	}
